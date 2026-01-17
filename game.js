@@ -1,9 +1,9 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// 1. 보안 설정: 브라우저 저장소 활용
+// 1. 보안 및 초기 설정 (기존과 동일)
 let API_KEY = localStorage.getItem("gemini_api_key");
 if (!API_KEY) {
-    const inputKey = prompt("Gemini API 키를 입력해주세요.\n(이 키는 본인의 브라우저에만 저장되며 GitHub에는 노출되지 않습니다.)");
+    const inputKey = prompt("Gemini API 키를 입력해주세요.");
     if (inputKey) {
         API_KEY = inputKey.trim();
         localStorage.setItem("gemini_api_key", API_KEY);
@@ -15,7 +15,6 @@ if (API_KEY) {
     genAI = new GoogleGenerativeAI(API_KEY);
 }
 
-// 게임 상태 관리 (gold -> money 통일)
 let gameState = {
     location: 'west',
     level: 1,
@@ -24,28 +23,30 @@ let gameState = {
     day: 1,
     intimacy: 0,
     inventory: [],
-    dailyItems: [], // 상점 물건
+    dailyItems: [],
     hasQueenGem: false
 };
 
-// 2. 장소 및 페르소나 설정 (묘사 구체화)
+// 2. 장소 묘사 및 도움말 추가
 const locations = {
     west: {
         name: "서쪽 발굴지 (유나의 텐트)",
-        description: `낡은 방수포가 펄럭이는 소리가 들립니다. 텐트 안은 발굴용 붓과 정밀 집게로 가득하며, 공기 중에는 오래된 흙먼지와 유나의 화장품 냄새가 미묘하게 섞여 있습니다. 한구석에서 '유나'가 낡은 고문서를 뒤적이고 있습니다.`
+        description: `낡은 방수포가 펄럭이는 소리가 들립니다. 텐트 중앙에는 각종 유물이 어지럽게 놓인 '낡은 책상'이 있습니다. 유나가 여기서 감정 작업을 도와주는 모양입니다.`,
+        help: "💡 [명령어: '감정 1', '책상', '대화'] (높은 등급 감정은 친밀도가 필요해!)"
     },
     east: {
         name: "동쪽 길목 (잡화점)",
-        description: `오래된 나무 향과 놋쇠 냄새가 코를 찌릅니다. 할아버지는 먼지 쌓인 카운터 뒤에서 말없이 안경을 닦고 있습니다. 주변에는 주인을 잃은 유물 조각들이 진열장에 아무렇게나 놓여 있습니다.`
+        description: `오래된 나무 향이 가득합니다. 할아버지가 카운터에서 물건을 진열하고 있습니다. 여기서 물건을 사거나, 감정된 유물을 팔 수 있습니다.`,
+        help: "💡 [명령어: '구매 1', '판매 1', '이동']"
     }
 };
 
 const personas = {
-    west: () => `너는 17세 여고생 '유나'야. 본명 '고'인 플레이어에게 쌀쌀맞지만 고고학엔 진심이야. 현재 친밀도는 ${gameState.intimacy}%야. 짧고 퉁명스러운 반말로 1~2문장만 말해.`,
-    east: () => `너는 신비로운 '골동품점 할아버지'야. 인자하지만 말수가 아주 적어. 반드시 1문장으로 핵심만 짧게 대답해. 플레이어 '고'의 레벨은 ${gameState.level}이야.`
+    west: () => `너는 17세 고고학도 '유나'야. 플레이어 '고'에게 쌀쌀맞은 반말을 써. 친밀도(${gameState.intimacy}%)에 따라 말투가 아주 조금씩 부드러워져. 1~2문장으로 짧게 답해.`,
+    east: () => `너는 인자한 잡화점 할아버지야. '고'가 가져온 유물을 매입하거나 새 물건을 팔아. 인자하게 한 문장으로만 말해.`
 };
 
-// 3. 핵심 엔진 함수
+// 3. UI 업데이트
 function updateUI() {
     const loc = locations[gameState.location];
     document.getElementById('stat-loc').innerText = loc.name;
@@ -55,60 +56,137 @@ function updateUI() {
     document.getElementById('stat-intimacy').innerText = gameState.intimacy;
     
     const itemsEl = document.getElementById('items');
-    itemsEl.innerHTML = gameState.inventory.map((i, idx) => `<li>[${idx+1}] ${i.name}</li>`).join('');
+    itemsEl.innerHTML = gameState.inventory.map((i, idx) => 
+        `<li>[${idx+1}] ${i.name} ${i.isAppraised ? '(감정완료)' : '(미감정)'}</li>`
+    ).join('');
 }
 
+// 4. 핵심 명령어 처리
 async function handleCommand(cmd) {
     if (!cmd) return;
     addLog("나", cmd, "my-msg");
     const lowerCmd = cmd.toLowerCase();
 
-    // 이동 로직
-    if (lowerCmd.includes("오른쪽") || lowerCmd.includes("동쪽") || lowerCmd.includes("east")) {
+    // 이동
+    if (lowerCmd.includes("동쪽") || lowerCmd.includes("오른쪽")) {
         gameState.location = 'east';
-        addLog("시스템", locations.east.description, "system-msg");
+        updateStatus();
         showShopList();
-    } 
-    else if (lowerCmd.includes("왼쪽") || lowerCmd.includes("서쪽") || lowerCmd.includes("west")) {
+        return;
+    }
+    if (lowerCmd.includes("서쪽") || lowerCmd.includes("왼쪽")) {
         gameState.location = 'west';
-        addLog("시스템", locations.west.description, "system-msg");
-    } 
-    // 구매 로직
-    else if (lowerCmd.includes("구매") || lowerCmd.includes("사기")) {
+        updateStatus();
+        return;
+    }
+
+    // 구매 (동쪽)
+    if (gameState.location === 'east' && (lowerCmd.includes("구매") || lowerCmd.includes("사기"))) {
         const idx = parseInt(lowerCmd.replace(/[^0-9]/g, "")) - 1;
         buyItem(idx);
-    } 
-    // 감정 로직 (유나의 방에서만 가능)
-    else if (lowerCmd.includes("감정") || lowerCmd.includes("팔기")) {
-        if (gameState.location !== 'west') {
-            addLog("시스템", "감정은 서쪽 텐트의 유나에게 가서 해야 합니다.", "system-msg");
-        } else if (gameState.inventory.length > 0) {
-            const idx = parseInt(lowerCmd.replace(/[^0-9]/g, "")) - 1 || 0;
-            await appraiseItemAI(idx);
-        } else {
-            addLog("시스템", "감정할 물건이 인벤토리에 없습니다.", "system-msg");
-        }
-    } 
-    else {
-        await callGeminiAI(cmd);
+        return;
+    }
+
+    // 판매 (동쪽)
+    if (gameState.location === 'east' && (lowerCmd.includes("판매") || lowerCmd.includes("팔기"))) {
+        const idx = parseInt(lowerCmd.replace(/[^0-9]/g, "")) - 1;
+        sellItem(idx);
+        return;
+    }
+
+    // 감정 (서쪽, 책상)
+    if (gameState.location === 'west' && (lowerCmd.includes("감정") || lowerCmd.includes("책상"))) {
+        const idx = parseInt(lowerCmd.replace(/[^0-9]/g, "")) - 1 || 0;
+        await appraiseAtDesk(idx);
+        return;
+    }
+
+    await callGeminiAI(cmd);
+    updateUI();
+}
+
+function updateStatus() {
+    const loc = locations[gameState.location];
+    addLog("시스템", "--------------------------------", "system-msg");
+    addLog("시스템", loc.description, "system-msg");
+    addLog("시스템", loc.help, "system-msg");
+    updateUI();
+}
+
+// 5. 게임 기능 로직
+async function appraiseAtDesk(idx) {
+    const item = gameState.inventory[idx];
+    if (!item) {
+        addLog("시스템", "감정할 물건이 없어.", "system-msg");
+        return;
+    }
+    if (item.isAppraised) {
+        addLog("유나", "이미 감정 끝난 거야. 할아버지한테나 가봐.", "npc-girl");
+        return;
+    }
+
+    // 등급별 친밀도 체크
+    let requiredIntimacy = 0;
+    if (item.grade > 80) requiredIntimacy = 50;
+    else if (item.grade > 50) requiredIntimacy = 20;
+
+    if (gameState.intimacy < requiredIntimacy) {
+        addLog("유나", `이건 너무 정교해서 지금의 너랑은 분석하기 싫어. 나랑 더 친해지든가. (필요 친밀도: ${requiredIntimacy})`, "npc-girl");
+        return;
+    }
+
+    // AI 감정 대사 (반말 페르소나 적용)
+    const prompt = `너는 고고학도 유나야. 플레이어 '고'가 가져온 '${item.name}'(등급:${item.grade}/100)을 책상에서 감정하고 있어. 
+                   결과에 대해 쌀쌀맞은 반말로 한 문장만 말해줘. 
+                   등급이 높으면 조금 놀란 척을 하고, 낮으면 한심해해.`;
+    
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-flash-lite-latest" });
+        const result = await model.generateContent(prompt);
+        const yunaReply = result.response.text().trim();
+
+        item.isAppraised = true; // 감정 완료 상태로 변경
+        // 등급에 따른 판매 가격 책정 (감정 완료 시점에 고정)
+        item.value = Math.floor(item.grade * 15 * (1 + gameState.level * 0.1)); 
+
+        addLog("유나", yunaReply, "npc-girl");
+        addLog("시스템", `[감정완료] '${item.name}'의 가치를 파악했다! 할아버지에게 팔 수 있어.`, "system-msg");
+        gameState.exp += 20;
+    } catch (e) {
+        addLog("시스템", "감정 장비가 고장 났나 봐(AI 오류).", "system-msg");
     }
     updateUI();
 }
 
-// 4. AI 상점 물건 생성 (랜덤 등급 부여)
+function sellItem(idx) {
+    const item = gameState.inventory[idx];
+    if (!item) {
+        addLog("할아버지", "팔 물건이 없구려.", "npc-elder");
+        return;
+    }
+    if (!item.isAppraised) {
+        addLog("할아버지", "유나 양에게 가서 감정을 먼저 받아오게나. 뭔지 알아야 사지.", "npc-elder");
+        return;
+    }
+
+    gameState.money += item.value;
+    addLog("시스템", `'${item.name}'을 ${item.value}원에 판매했습니다.`, "system-msg");
+    gameState.inventory.splice(idx, 1);
+    updateUI();
+}
+
 async function refreshShop() {
-    addLog("시스템", "할아버지가 새로운 물건들을 진열합니다...", "system-msg");
     const newItems = [];
     const model = genAI.getGenerativeModel({ model: "gemini-flash-lite-latest" });
-
     for (let i = 0; i < 3; i++) {
-        const prompt = "고고학 유적지에서 발견된 낡은 골동품 이름을 딱 하나만 지어줘. 예: 진흙 묻은 단추. 수식어 포함해서 6자 이내로.";
+        const prompt = "낡은 유물 이름을 5자 이내로 하나 지어줘. 예: 깨진 청자.";
         const result = await model.generateContent(prompt);
-        const name = result.response.text().trim();
-        
-        // 보이지 않는 등급 (1~100)
-        const grade = Math.floor(Math.random() * 100) + 1; 
-        newItems.push({ name, cost: 200, grade: grade });
+        newItems.push({ 
+            name: result.response.text().trim(), 
+            cost: 200, 
+            grade: Math.floor(Math.random() * 100) + 1,
+            isAppraised: false 
+        });
     }
     gameState.dailyItems = newItems;
 }
@@ -122,84 +200,33 @@ function buyItem(idx) {
     const item = gameState.dailyItems[idx];
     if (item && gameState.money >= item.cost) {
         gameState.money -= item.cost;
-        gameState.inventory.push({...item}); // 객체 복사해서 인벤토리에 추가
-        addLog("시스템", `'${item.name}'을 구매했습니다. 유나에게 가서 감정받으세요.`, "system-msg");
+        gameState.inventory.push({...item});
+        addLog("시스템", `'${item.name}' 구매! 유나의 책상으로 가자.`, "system-msg");
     } else {
-        addLog("할아버지", "돈이 모자라거나 물건이 없구려.", "npc-elder");
+        addLog("할아버지", "돈이 모자라구먼.", "npc-elder");
     }
+    updateUI();
 }
 
-// 5. AI 감정 시스템 (등급에 따른 금액 결정)
-async function appraiseItemAI(idx) {
-    const item = gameState.inventory[idx];
-    if (!item) return;
-
-    const grade = item.grade;
-    let value = 0;
-    let gradeText = "";
-
-    // 등급에 따른 가치 결정
-    if (grade > 90) { value = 1500; gradeText = "전설적인 보물"; }
-    else if (grade > 60) { value = 500; gradeText = "희귀한 유물"; }
-    else if (grade > 30) { value = 250; gradeText = "평범한 골동품"; }
-    else { value = 50; gradeText = "거의 쓰레기"; }
-
-    // 유나에게 감정 대사 요청
-    const prompt = `너는 고고학 감정사 유나야. 플레이어가 가져온 '${item.name}'은 사실 '${gradeText}' 등급이야. 
-                   이걸 보고 쌀쌀맞게 감정평을 한 문장으로 해줘. 가치는 ${value}원이야.`;
-    
-    try {
-        const model = genAI.getGenerativeModel({ model: "gemini-flash-lite-latest" });
-        const result = await model.generateContent(prompt);
-        const yunaReply = result.response.text().trim();
-
-        addLog("유나", yunaReply, "npc-girl");
-        addLog("시스템", `[감정결과: ${gradeText}] ${value}원에 판매했습니다! (+경험치 30)`, "system-msg");
-
-        gameState.money += value;
-        gameState.exp += 30;
-        gameState.inventory.splice(idx, 1);
-
-        if (gameState.exp >= gameState.level * 100) {
-            gameState.level++;
-            gameState.exp = 0;
-            addLog("시스템", `축하합니다! 고고학 레벨이 ${gameState.level}로 올랐습니다!`, "system-msg");
-        }
-    } catch (e) {
-        addLog("시스템", "감정 중 오류가 발생했습니다.", "system-msg");
-    }
-}
-
-// Gemini AI 일반 대화 (기존 유지)
 async function callGeminiAI(userText) {
     const npcName = gameState.location === 'west' ? "유나" : "할아버지";
     const colorClass = gameState.location === 'west' ? "npc-girl" : "npc-elder";
-
     try {
         const model = genAI.getGenerativeModel({ 
             model: "gemini-flash-lite-latest",
             systemInstruction: personas[gameState.location]()
         });
-
-        const chatSession = model.startChat({ history: [] });
-        const result = await chatSession.sendMessage(userText);
-        const reply = result.response.text();
-
-        addLog(npcName, reply, colorClass);
-
-        if (gameState.location === 'west') {
-            gameState.intimacy = Math.min(100, gameState.intimacy + 1);
-        }
+        const result = await model.generateContent(userText);
+        addLog(npcName, result.response.text(), colorClass);
+        if (gameState.location === 'west') gameState.intimacy = Math.min(100, gameState.intimacy + 1);
     } catch (e) {
-        console.error(e);
-        addLog("시스템", "AI가 대답을 거부했습니다. (할당량 초과일 수 있음)", "system-msg");
+        addLog("시스템", "AI 통신 오류.", "system-msg");
     }
 }
 
 function addLog(sender, msg, className) {
     const logContainer = document.getElementById('chat-log');
     const div = document.createElement('div');
-    div.style.marginBottom = "5px";
     div.innerHTML = `<span class="${className}">[${sender}]</span> ${msg}`;
     logContainer.appendChild(div);
     const panel = document.getElementById('log-panel');
@@ -210,8 +237,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const inputEl = document.getElementById('user-input');
     inputEl.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
-            const cmd = inputEl.value.trim();
-            handleCommand(cmd);
+            handleCommand(inputEl.value.trim());
             inputEl.value = '';
         }
     });
