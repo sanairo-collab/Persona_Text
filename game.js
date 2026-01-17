@@ -257,6 +257,17 @@ document.addEventListener('DOMContentLoaded', () => {
             inputEl.value = '';
         }
     });
+
+    // 1. 상점 물건 초기화
     refreshShop();
+    
+    // 2. UI 및 상태바 업데이트
     updateUI();
+
+    // [수정된 부분] 3. 시작하자마자 첫 스폰 장소(서쪽)의 설명과 도움말 출력
+    const startLoc = locations[gameState.location];
+    addLog("시스템", "--------------------------------", "system-msg");
+    addLog("시스템", startLoc.description, "system-msg");
+    addLog("시스템", startLoc.help, "system-msg");
 });
+
