@@ -1,8 +1,11 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // 1. 설정 및 초기화
-const API_KEY = "AIzaSyAGUsEQ2zXlX_mLfdf9eQbnJbiZLcEBkE8";
-const genAI = new GoogleGenerativeAI(API_KEY);
+const RAW_KEY = "AIzaSyAGUsEQ2zXlX_mLfdf9eQbnJbiZLcEBkE8"; // 여기에 키를 입력하세요.
+const API_KEY = RAW_KEY.replace(/[^a-zA-Z0-9_-]/g, "");
+
+// 전역 변수로 선언만 해둡니다.
+let genAI = null;
 
 let gameState = {
     location: 'west',
@@ -22,14 +25,12 @@ const personas = {
     east: () => `너는 신비로운 '골동품점 할아버지'야. 인자한 말투를 써. 플레이어의 고고학 레벨은 ${gameState.level}이야.`
 };
 
-// 3. 게임 엔진 함수 (명령어 처리)
+// 3. 게임 엔진 함수
 async function handleCommand(cmd) {
     if (!cmd) return;
     addLog("나", cmd, "my-msg");
-
     const lowerCmd = cmd.toLowerCase();
 
-    // 이동 로직
     if (lowerCmd === "오른쪽" || lowerCmd === "east" || lowerCmd === "동쪽") {
         gameState.location = 'east';
         addLog("시스템", "잡화점으로 이동했습니다. 할아버지가 인사를 건넵니다.", "system-msg");
@@ -39,36 +40,45 @@ async function handleCommand(cmd) {
         gameState.location = 'west';
         addLog("시스템", "유나의 방으로 돌아왔습니다.", "system-msg");
     } 
-    // 구매 로직
     else if (lowerCmd.startsWith("구매")) {
         const idx = parseInt(lowerCmd.replace("구매", "").trim()) - 1;
         buyItem(idx);
     } 
-    // 감정 로직
     else if (lowerCmd === "감정") {
         if (gameState.inventory.length > 0) appraiseItem(0);
         else addLog("시스템", "감정할 물건이 없습니다.", "system-msg");
     } 
-    // 대화 로직 (AI 호출)
     else {
         await callGeminiAI(cmd);
     }
     updateUI();
 }
 
-// 4. Gemini AI 통신
+// 4. Gemini AI 통신 (객체 생성 시점 변경)
 async function callGeminiAI(userText) {
     const npcName = gameState.location === 'west' ? "유나" : "할아버지";
     const colorClass = gameState.location === 'west' ? "npc-girl" : "npc-elder";
 
     try {
+        // 대화 직전에 키 상태를 확인하고 객체를 생성합니다.
+        if (!API_KEY) {
+            addLog("시스템", "API 키가 설정되지 않았습니다.", "system-msg");
+            return;
+        }
+        
+        // genAI 객체가 없으면 여기서 생성합니다.
+        if (!genAI) {
+            genAI = new GoogleGenerativeAI(API_KEY);
+        }
+
         const model = genAI.getGenerativeModel({ 
             model: "gemini-1.5-flash",
             systemInstruction: personas[gameState.location]()
         });
 
         const result = await model.generateContent(userText);
-        const reply = result.response.text();
+        const response = await result.response;
+        const reply = response.text();
 
         addLog(npcName, reply, colorClass);
 
@@ -82,19 +92,18 @@ async function callGeminiAI(userText) {
             }
         }
     } catch (e) {
-        console.error(e);
-        addLog("시스템", "AI 응답 오류: API 키나 인터넷 연결을 확인하세요.", "system-msg");
+        console.error("에러 발생:", e);
+        addLog("시스템", "AI 응답 오류가 발생했습니다. 키 설정을 다시 확인해주세요.", "system-msg");
     }
 }
 
-// 5. 유틸리티 함수 (로그 및 UI)
+// 5. 유틸리티 함수 (동일)
 function addLog(sender, msg, className) {
     const logContainer = document.getElementById('chat-log');
     const div = document.createElement('div');
     div.style.marginBottom = "5px";
     div.innerHTML = `<span class="${className}">[${sender}]</span> ${msg}`;
     logContainer.appendChild(div);
-    
     const panel = document.getElementById('log-panel');
     panel.scrollTop = panel.scrollHeight;
 }
@@ -105,7 +114,6 @@ function updateUI() {
     document.getElementById('stat-money').innerText = gameState.money.toLocaleString();
     document.getElementById('stat-time').innerText = `${gameState.day}일차`;
     document.getElementById('stat-intimacy').innerText = gameState.intimacy;
-    
     const itemsEl = document.getElementById('items');
     itemsEl.innerHTML = gameState.inventory.map(i => `<li>${i.name}</li>`).join('');
 }
@@ -152,10 +160,8 @@ function appraiseItem(idx) {
     }
 }
 
-// 6. 이벤트 리스너 (DOMContentLoaded로 감싸서 안전하게 실행)
 document.addEventListener('DOMContentLoaded', () => {
     const inputEl = document.getElementById('user-input');
-    
     inputEl.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             const cmd = inputEl.value.trim();
@@ -163,10 +169,6 @@ document.addEventListener('DOMContentLoaded', () => {
             inputEl.value = '';
         }
     });
-
     refreshShop();
     updateUI();
-    console.log("게임이 준비되었습니다.");
-
 });
-
