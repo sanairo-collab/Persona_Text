@@ -1,11 +1,22 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// 1. 설정 및 초기화
-const RAW_KEY = "AIzaSyAGUsEQ2zXlX_mLfdf9eQbnJbiZLcEBkE8"; // 여기에 키를 입력하세요.
-const API_KEY = RAW_KEY.replace(/[^a-zA-Z0-9_-]/g, "");
+// [수정된 부분] 1. 보안 설정: 브라우저 저장소에서 키를 가져오거나 새로 입력받음
+let API_KEY = localStorage.getItem("gemini_api_key");
 
-// 전역 변수로 선언만 해둡니다.
-const genAI = new GoogleGenerativeAI(API_KEY);
+if (!API_KEY) {
+    // 키가 저장되어 있지 않다면 사용자에게 물어봅니다.
+    const inputKey = prompt("Gemini API 키를 입력해주세요.\n(이 키는 본인의 브라우저에만 저장되며 GitHub에는 노출되지 않습니다.)");
+    if (inputKey) {
+        API_KEY = inputKey.trim();
+        localStorage.setItem("gemini_api_key", API_KEY);
+    }
+}
+
+// 전역 변수 설정 (키가 있을 때만 생성)
+let genAI = null;
+if (API_KEY) {
+    genAI = new GoogleGenerativeAI(API_KEY);
+}
 
 let gameState = {
     location: 'west',
@@ -173,6 +184,7 @@ document.addEventListener('DOMContentLoaded', () => {
     refreshShop();
     updateUI();
 });
+
 
 
 
