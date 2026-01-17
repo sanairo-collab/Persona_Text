@@ -54,41 +54,48 @@ async function handleCommand(cmd) {
     updateUI();
 }
 
-// 4. Gemini AI 통신 (객체 생성 시점 변경)
+// 4. Gemini AI 통신 (404 방지 최적화 버전)
 async function callGeminiAI(userText) {
     const npcName = gameState.location === 'west' ? "유나" : "할아버지";
     const colorClass = gameState.location === 'west' ? "npc-girl" : "npc-elder";
 
     try {
-        if (!API_KEY) {
-            addLog("시스템", "API 키가 설정되지 않았습니다.", "system-msg");
-            return;
-        }
-        
+        // 1. 객체가 제대로 생성되었는지 재확인
         if (!genAI) {
             genAI = new GoogleGenerativeAI(API_KEY);
         }
 
-        // 핵심 수정 부분: 모델 이름 앞에 'models/'를 명시합니다.
+        // 2. 모델 설정 (경로를 "models/..." 없이 이름만 써보거나, 
+        // 404가 계속되면 "gemini-1.5-flash-latest"로 시도)
         const model = genAI.getGenerativeModel({ 
-            model: "gemini-1.5-flash", 
+            model: "gemini-1.5-flash", // 'models/'를 빼고 써보세요.
             systemInstruction: personas[gameState.location]()
         });
 
-        const result = await model.generateContent(userText);
+        // 3. 채팅 세션 없이 직접 생성 (가장 충돌이 적은 방식)
+        const result = await model.generateContent({
+            contents: [{ role: "user", parts: [{ text: userText }] }]
+        });
+        
         const response = await result.response;
         const reply = response.text();
 
         addLog(npcName, reply, colorClass);
 
-        // 친밀도 업데이트 로직 (유나일 때만)
+        // 친밀도 및 특수 아이템 로직
         if (gameState.location === 'west') {
             gameState.intimacy = Math.min(100, gameState.intimacy + 1);
+            if (gameState.intimacy >= 100 && gameState.level >= 10 && !gameState.hasQueenGem) {
+                if (reply.includes("보석") || reply.includes("감정")) {
+                    gameState.hasQueenGem = true;
+                    addLog("시스템", "유나가 낡은 보석을 건넸습니다...!", "system-msg");
+                }
+            }
         }
     } catch (e) {
-        console.error("상세 에러:", e);
-        // 에러 메시지에 '404'가 포함되어 있다면 모델명 문제일 확률이 높습니다.
-        addLog("시스템", "AI 연결에 실패했습니다. (모델 경로 확인 필요)", "system-msg");
+        console.error("에러 상세 로그:", e);
+        // 에러가 404라면 모델명을 "models/gemini-1.5-flash"로 다시 시도해야 할 수도 있습니다.
+        addLog("시스템", "AI가 응답하지 않습니다. (모델 경로 오류 가능성)", "system-msg");
     }
 }
 
@@ -167,6 +174,7 @@ document.addEventListener('DOMContentLoaded', () => {
     refreshShop();
     updateUI();
 });
+
 
 
 
