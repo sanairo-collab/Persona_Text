@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>고고학자의 길: 소녀와 유물</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="game-container">
+        <div id="status-panel">
+            <h2>상태창</h2>
+            <div class="stat-item">위치: <span id="stat-loc">서쪽 방</span></div>
+            <div class="stat-item">고고학 레벨: <span id="stat-level">1</span></div>
+            <div class="stat-item">소지금: <span id="stat-money">1,000</span>원</div>
+            <div class="stat-item">날짜: <span id="stat-time">1일차</span></div>
+            <div class="stat-item">소녀 친밀도: <span id="stat-intimacy">0</span>%</div>
+            <hr>
+            <div id="inventory-list">
+                <strong>[인벤토리]</strong>
+                <ul id="items"></ul>
+            </div>
+        </div>
+
+        <div id="log-panel">
+            <div id="chat-log">
+                <div class="system-msg">게임을 시작합니다. '왼쪽' 혹은 '오른쪽'으로 이동하세요.</div>
+            </div>
+        </div>
+
+        <div id="input-panel">
+            <input type="text" id="user-input" placeholder="NPC와 대화하거나 명령어를 입력하세요..." autofocus>
+        </div>
+    </div>
+    <script type="importmap">
+  {
+    "imports": {
+      "@google/generative-ai": "https://esm.run/@google/generative-ai"
+    }
+  }
+    </script>
+    <script type="module" src="game.js"></script>
+</body>
+</html>
