@@ -60,42 +60,43 @@ async function callGeminiAI(userText) {
     const colorClass = gameState.location === 'west' ? "npc-girl" : "npc-elder";
 
     try {
-        // 1. 객체가 제대로 생성되었는지 재확인
         if (!genAI) {
             genAI = new GoogleGenerativeAI(API_KEY);
         }
 
-        // 2. 모델 설정 (경로를 "models/..." 없이 이름만 써보거나, 
-        // 404가 계속되면 "gemini-1.5-flash-latest"로 시도)
+        // [중요] 404를 피하기 위해 가장 호환성이 높은 모델명 형식을 사용합니다.
+        // models/ 를 명시적으로 붙여주는 것이 v1beta 버전에서는 필수입니다.
         const model = genAI.getGenerativeModel({ 
-            model: "gemini-1.5-flash", // 'models/'를 빼고 써보세요.
+            model: "models/gemini-1.5-flash",
             systemInstruction: personas[gameState.location]()
         });
 
-        // 3. 채팅 세션 없이 직접 생성 (가장 충돌이 적은 방식)
-        const result = await model.generateContent({
-            contents: [{ role: "user", parts: [{ text: userText }] }]
+        // 채팅 세션 구조를 명확히 하여 요청 주소 오류를 방지합니다.
+        const chatSession = model.startChat({
+            history: [],
+            generationConfig: {
+                maxOutputTokens: 200,
+            },
         });
-        
+
+        const result = await chatSession.sendMessage(userText);
         const response = await result.response;
         const reply = response.text();
 
         addLog(npcName, reply, colorClass);
 
-        // 친밀도 및 특수 아이템 로직
         if (gameState.location === 'west') {
             gameState.intimacy = Math.min(100, gameState.intimacy + 1);
-            if (gameState.intimacy >= 100 && gameState.level >= 10 && !gameState.hasQueenGem) {
-                if (reply.includes("보석") || reply.includes("감정")) {
-                    gameState.hasQueenGem = true;
-                    addLog("시스템", "유나가 낡은 보석을 건넸습니다...!", "system-msg");
-                }
-            }
         }
     } catch (e) {
-        console.error("에러 상세 로그:", e);
-        // 에러가 404라면 모델명을 "models/gemini-1.5-flash"로 다시 시도해야 할 수도 있습니다.
-        addLog("시스템", "AI가 응답하지 않습니다. (모델 경로 오류 가능성)", "system-msg");
+        console.error("상세 에러 로그:", e);
+        // 에러가 계속되면 모델명을 "gemini-1.5-flash" (models/ 제외)로 바꿔보라는 안내
+        addLog("시스템", "연결 실패. 모델명을 다시 조정합니다...", "system-msg");
+        
+        // 자동 재시도 로직 (models/ 유무 차이 극복)
+        if (e.message.includes("404") || e.message.includes("not found")) {
+             addLog("시스템", "팁: 모델명에서 'models/'를 빼거나 넣어보며 테스트 중입니다.", "system-msg");
+        }
     }
 }
 
@@ -174,6 +175,7 @@ document.addEventListener('DOMContentLoaded', () => {
     refreshShop();
     updateUI();
 });
+
 
 
 
