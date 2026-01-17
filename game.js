@@ -67,7 +67,7 @@ async function callGeminiAI(userText) {
         // [중요] 404를 피하기 위해 가장 호환성이 높은 모델명 형식을 사용합니다.
         // models/ 를 명시적으로 붙여주는 것이 v1beta 버전에서는 필수입니다.
         const model = genAI.getGenerativeModel({ 
-            model: "models/gemini-1.5-flash",
+            model: "gemini-1.5-flash-latest",
             systemInstruction: personas[gameState.location]()
         });
 
@@ -175,6 +175,7 @@ document.addEventListener('DOMContentLoaded', () => {
     refreshShop();
     updateUI();
 });
+
 
 
 
