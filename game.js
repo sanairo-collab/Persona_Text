@@ -71,7 +71,7 @@ async function callGeminiAI(userText) {
 
         // 핵심 수정 부분: 모델 이름 앞에 'models/'를 명시합니다.
         const model = genAI.getGenerativeModel({ 
-            model: "gemini-2.5-flash", 
+            model: "models/gemini-1.5-flash", 
             systemInstruction: personas[gameState.location]()
         });
 
@@ -167,6 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
     refreshShop();
     updateUI();
 });
+
 
 
 
