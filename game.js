@@ -72,8 +72,8 @@ async function callGeminiAI(userText) {
         }
 
         const model = genAI.getGenerativeModel({ 
-            model: "gemini-1.5-flash",
-            systemInstruction: personas[gameState.location]()
+        model: "models/gemini-1.5-flash", // "gemini-1.5-flash" 앞에 "models/"를 추가
+        systemInstruction: personas[gameState.location]()
         });
 
         const result = await model.generateContent(userText);
@@ -172,3 +172,4 @@ document.addEventListener('DOMContentLoaded', () => {
     refreshShop();
     updateUI();
 });
+
