@@ -65,7 +65,7 @@ async function callGeminiAI(userText) {
         }
 
         const model = genAI.getGenerativeModel({ 
-            model: "gemini-1.5-flash-001",
+            model: "gemini-2.5-flash",
             systemInstruction: personas[gameState.location]()
         });
 
@@ -173,6 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
     refreshShop();
     updateUI();
 });
+
 
 
 
