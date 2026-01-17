@@ -5,7 +5,7 @@ const RAW_KEY = "AIzaSyAGUsEQ2zXlX_mLfdf9eQbnJbiZLcEBkE8"; // 여기에 키를 �
 const API_KEY = RAW_KEY.replace(/[^a-zA-Z0-9_-]/g, "");
 
 // 전역 변수로 선언만 해둡니다.
-let genAI = null;
+const genAI = new GoogleGenerativeAI(API_KEY);
 
 let gameState = {
     location: 'west',
@@ -71,7 +71,7 @@ async function callGeminiAI(userText) {
 
         // 핵심 수정 부분: 모델 이름 앞에 'models/'를 명시합니다.
         const model = genAI.getGenerativeModel({ 
-            model: "models/gemini-1.5-flash", 
+            model: "gemini-1.5-flash", 
             systemInstruction: personas[gameState.location]()
         });
 
@@ -167,6 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
     refreshShop();
     updateUI();
 });
+
 
 
 
