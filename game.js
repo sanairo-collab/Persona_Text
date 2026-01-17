@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // 1. 설정 및 초기화
-const API_KEY = "여기에_실제_API_키를_넣으세요"; 
+const API_KEY = "AIzaSyAGUsEQ2zXlX_mLfdf9eQbnJbiZLcEBkE8"; 
 const genAI = new GoogleGenerativeAI(API_KEY);
 
 let gameState = {
@@ -167,4 +167,5 @@ document.addEventListener('DOMContentLoaded', () => {
     refreshShop();
     updateUI();
     console.log("게임이 준비되었습니다.");
+
 });
