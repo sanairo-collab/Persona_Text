@@ -60,20 +60,19 @@ async function callGeminiAI(userText) {
     const colorClass = gameState.location === 'west' ? "npc-girl" : "npc-elder";
 
     try {
-        // 대화 직전에 키 상태를 확인하고 객체를 생성합니다.
         if (!API_KEY) {
             addLog("시스템", "API 키가 설정되지 않았습니다.", "system-msg");
             return;
         }
         
-        // genAI 객체가 없으면 여기서 생성합니다.
         if (!genAI) {
             genAI = new GoogleGenerativeAI(API_KEY);
         }
 
+        // 핵심 수정 부분: 모델 이름 앞에 'models/'를 명시합니다.
         const model = genAI.getGenerativeModel({ 
-        model: "models/gemini-1.5-flash", // "gemini-1.5-flash" 앞에 "models/"를 추가
-        systemInstruction: personas[gameState.location]()
+            model: "models/gemini-1.5-flash", 
+            systemInstruction: personas[gameState.location]()
         });
 
         const result = await model.generateContent(userText);
@@ -82,18 +81,14 @@ async function callGeminiAI(userText) {
 
         addLog(npcName, reply, colorClass);
 
+        // 친밀도 업데이트 로직 (유나일 때만)
         if (gameState.location === 'west') {
             gameState.intimacy = Math.min(100, gameState.intimacy + 1);
-            if (gameState.intimacy >= 100 && gameState.level >= 10 && !gameState.hasQueenGem) {
-                if (reply.includes("보석") || reply.includes("감정")) {
-                    gameState.hasQueenGem = true;
-                    addLog("시스템", "유나가 낡은 보석을 건넸습니다...!", "system-msg");
-                }
-            }
         }
     } catch (e) {
-        console.error("에러 발생:", e);
-        addLog("시스템", "AI 응답 오류가 발생했습니다. 키 설정을 다시 확인해주세요.", "system-msg");
+        console.error("상세 에러:", e);
+        // 에러 메시지에 '404'가 포함되어 있다면 모델명 문제일 확률이 높습니다.
+        addLog("시스템", "AI 연결에 실패했습니다. (모델 경로 확인 필요)", "system-msg");
     }
 }
 
@@ -172,4 +167,5 @@ document.addEventListener('DOMContentLoaded', () => {
     refreshShop();
     updateUI();
 });
+
 
